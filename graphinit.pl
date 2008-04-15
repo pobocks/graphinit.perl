@@ -10,36 +10,57 @@ use warnings;
 my $inits = "";
 my $name = "";
 my $init = 0;
+my $dex = 10;
 my %charactersbyinit = ();
 my @listchars = ();
 my $charlist;
-# DATA STRUCTURE NOTES: %charactersbyinit is a hash of array references.  
-# The keys of the hash are the numbers entered as initiatives, the
-# arrays contain the names of the characters that go on that 
-# initiative.  Example: If Dave has a 15, Candy has a 17, and 
-# Moose and Squirrel both have a 6, the hash will look like this:
-#      %hash = (15 => ["Dave"], 17 => ["Candy"], 6 => ["Moose", "Squirrel"]);
-# add_char and rm_char are constructed so as not to allow duplicate
-# names, and so as to trim numbers when they are not used.
 
+=pod
+
+=head1 DATA STRUCTURE NOTES: 
+
+ %charactersbyinit is a hash of array references.  
+ The keys of the hash are the numbers entered as initiatives, the
+ arrays contain the names of the characters that go on that 
+ initiative.  Example: If Dave has a 15, Candy has a 17, and 
+ Moose and Squirrel both have a 6, the hash will look like this:
+     %hash = (15 => ["Dave"], 17 => ["Candy"], 6 => ["Moose", "Squirrel"]);
+ add_char and rm_char are constructed so as not to allow duplicate
+ names, and so as to trim numbers when they are not used.
+
+ Possibilities: 
+    %charactersbyinit will be a hash of hashes of array references
+       Pros: path of least resistance, keeps sort simpler
+       Cons: Complex data structure, to say the least
+    %charactersbyinit will be a hash of arrays filled arrays;
+    Array[0] will be name, Array[1] will be dex
+       Pros: Potentially simpler mechanics.
+       Cons: Complete rewrite of system, pretty fucking much
+ 
+
+=cut
 
 sub print_initiative{
   $charlist->delete(0, 'end');
   my @sorted_keys = sort {$b <=> $a} keys %charactersbyinit;
   for my $current_init (@sorted_keys){
-    my @chars = @{$charactersbyinit{$current_init}};
-    for (@chars){
-      $charlist->insert("end", "$current_init: $_");
-    }
+      my $dexhash = $charactersbyinit{$current_init};
+      my @sorted_dexkeys = sort {$b <=> $a} keys %$dexhash;
+      for my $current_dex (@sorted_dexkeys){
+	  my @chars = @{$charactersbyinit{$current_init}{$current_dex}};
+	  for (@chars){
+	      $charlist->insert("end", "$current_init: $_ ($current_dex)");
+	  }
+      }   
   }
 }
 
 
 sub add_char{
-  my ($name,$init) = @_;
+  my ($name,$init,$dex) = @_;
   rm_char($name);
   if ($init =~ /\d/ && $name ne ''){
-    push(@{$charactersbyinit{$init}}, $name);
+    push(@{$charactersbyinit{$init}{$dex}}, $name);
     print_initiative();
   }
   else {
@@ -47,14 +68,22 @@ sub add_char{
   }
 }
 
+#BORKEN WORK START HERE
+#Needs to loop through the inits, then loop through the dexes, and delete based just on name.
 sub rm_char{
   my $name = shift;
-  for my $arrayref (values %charactersbyinit){
-    @$arrayref = grep( $_ ne $name , @$arrayref);
+  for my $hashref (values %charactersbyinit){
+      for my $arrayref (values %$hashref){
+	  @$arrayref = grep( $_ ne $name , @$arrayref);
+      }
   }
-  for (keys %charactersbyinit){
-    my $temp = $charactersbyinit{$_};
-    delete $charactersbyinit{$_} if scalar(@$temp) == 0;
+  for my $init (keys %charactersbyinit){
+      my $temp = $charactersbyinit{$init};
+      for my $dex (keys %$temp){
+	  my $temp2 = $charactersbyinit{$init}{$dex};
+	  delete $charactersbyinit{$init}{$dex} if scalar(@$temp2) == 0;
+      }
+      delete $charactersbyinit{$init} if scalar(keys %{$charactersbyinit{$init}}) == 0;
   }
   print_initiative();
 }
@@ -71,12 +100,15 @@ my $nameframe = $mw->Frame(-label => "Name: ",
 my $initframe = $mw->Frame(-label => "Init: ", 
 			-labelPack => [ -side => 'left'])->pack;
 
+my $dexframe  = $mw->Frame(-label => "Dex: ", 
+			-labelPack => [ -side => 'left'])->pack;
+
 #Add and delete buttons in frame that fills bottom of window above Exit
 my $adddeleteframe = $mw->Frame()->pack;
 
 $adddeleteframe->Button(-text => "Add", 
 			-font => "{Courier New} 12", 
-			-command => sub{add_char($name, $init)})->pack(-side => 'left', 
+			-command => sub{add_char($name, $init, $dex)})->pack(-side => 'left', 
 								       -expand => 0, 
 								       -fill => 'x');
 
@@ -96,16 +128,29 @@ my $initentry = $initframe->Entry(-width => 4,
 		  -textvariable => \$init, 
 		  -background => "white")->pack;
 
+my $dexentry =  $dexframe->Entry(-width => 4,
+		  -textvariable => \$dex, 
+		  -background => "white")->pack;
+
+
 #Bindings create this workflow:
 #    [Enter Name] -> <Return> -> [Enter Init] -> <Return> {Repeat}
+# OR [Enter Name] -> <Return> -> [Enter Init] -> <Tab> -> [Enter Dex] -> <Return> {Repeat}
 $nameentry->bind("<Return>", sub { $init = "";
 				   $initentry->focus();
 				 });
 
-$initentry->bind("<Return>", sub{ add_char($name, $init);
+$initentry->bind("<Return>", sub{ add_char($name, $init, $dex);
 				  $name = $init = "";
+				  $dex = 10;
 				  $nameentry->focus();
-				}); 
+		                }); 
+
+$dexentry->bind("<Return>", sub { add_char($name, $init, $dex);
+				  $name = $init = "";
+				  $dex = 10;
+				  $nameentry->focus();
+		                });
 
 #Creates a listbox to hold the initiatives and names
 $charlist = $mw->Scrolled("Listbox",
@@ -116,9 +161,10 @@ $charlist = $mw->Scrolled("Listbox",
 
 #If clicked with mouse, loads name and initiative into boxes!
 $charlist->bind('<Button-1>', sub { my $element = $charlist->get($charlist->curselection());
-				    $element =~ /(\d+): (.+)/;
+				    $element =~ /(\d+): (.+) \((\d+)\)/;
 				    $init = $1;
 				    $name = $2;
+				    $dex = $3;
 				  });
 #Clear initiative list
 $mw->Button(-text => "Clear", 
