@@ -19,25 +19,28 @@ my $charlist;
 
 =head1 DATA STRUCTURE NOTES: 
 
- %charactersbyinit is a hash of array references.  
- The keys of the hash are the numbers entered as initiatives, the
- arrays contain the names of the characters that go on that 
- initiative.  Example: If Dave has a 15, Candy has a 17, and 
- Moose and Squirrel both have a 6, the hash will look like this:
-     %hash = (15 => ["Dave"], 17 => ["Candy"], 6 => ["Moose", "Squirrel"]);
- add_char and rm_char are constructed so as not to allow duplicate
- names, and so as to trim numbers when they are not used.
+%charactersbyinit is a hash of hashes of arrays.
+The first level hash is indexed by the initiative number.
+The second level hashes are indexed by dexterity score.
+The arrays are unsorted lists of names.
 
- Possibilities: 
-    %charactersbyinit will be a hash of hashes of array references
-       Pros: path of least resistance, keeps sort simpler
-       Cons: Complex data structure, to say the least
-    %charactersbyinit will be a hash of arrays filled arrays;
-    Array[0] will be name, Array[1] will be dex
-       Pros: Potentially simpler mechanics.
-       Cons: Complete rewrite of system, pretty fucking much
- 
+Example: 
+Foo the barbarian rolls an initiative of 12, and has a Dex score of 8,
+Baz the thief also rolls a 12, and has a dex score of 18,
+Quux the Bard also rolls a 12 and has a dex of 18 
+Bar the Wizard rolls an 8, and has a dex score of 16 
+the hash would look like this:
 
+    %charactersbyinit-> {
+                         12 -> {
+                                18 -> ( Baz, Quux)
+				 8 -> (Foo)
+                               }
+			 8 ->	{
+				 16 -> (Bar)
+				}
+		        }
+	
 =cut
 
 sub print_initiative{
@@ -55,11 +58,11 @@ sub print_initiative{
   }
 }
 
-
+#Adds (or updates) a character to the initiative order.
 sub add_char{
   my ($name,$init,$dex) = @_;
   rm_char($name);
-  if ($init =~ /\d/ && $name ne ''){
+  if ($init =~ /\d/ && $dex =~ /\d/ && $name ne ''){
     push(@{$charactersbyinit{$init}{$dex}}, $name);
     print_initiative();
   }
@@ -68,8 +71,10 @@ sub add_char{
   }
 }
 
-#BORKEN WORK START HERE
-#Needs to loop through the inits, then loop through the dexes, and delete based just on name.
+#For each init, loops for each dexterity score 
+#and deletes based just on name.
+#(Note: Second double for loop is to prune empty dexes and
+# inits.)
 sub rm_char{
   my $name = shift;
   for my $hashref (values %charactersbyinit){
@@ -94,6 +99,7 @@ $mw->title("Initiative");
 $mw->Label(-text => "Inititative Program:\n",  
 	   -font => "{Courier New} 12")->pack;
 
+#Frames for name, initiative, and dexterity score.
 my $nameframe = $mw->Frame(-label => "Name: ", 
 			-labelPack => [ -side => 'left'])->pack;
 
@@ -102,6 +108,40 @@ my $initframe = $mw->Frame(-label => "Init: ",
 
 my $dexframe  = $mw->Frame(-label => "Dex: ", 
 			-labelPack => [ -side => 'left'])->pack;
+
+
+#Entries for name, initiative, and dexterity score
+my $nameentry = $nameframe->Entry(-width => 10,
+		  -textvariable => \$name, 
+		  -background => "white")->pack;
+		   
+my $initentry = $initframe->Entry(-width => 4,
+		  -textvariable => \$init, 
+		  -background => "white")->pack;
+
+my $dexentry =  $dexframe->Entry(-width => 4,
+		  -textvariable => \$dex, 
+		  -background => "white")->pack;
+
+#Bindings create this workflow:
+#    [Enter Name] -> <Return> -> [Enter Init] -> <Return> {Repeat}
+# OR [Enter Name] -> <Return> -> [Enter Init] -> <Tab> -> [Enter Dex] -> <Return> {Repeat}
+$nameentry->bind("<Return>", sub { $init = "";
+				   $initentry->focus();
+				 });
+
+$initentry->bind("<Return>", sub { add_char($name, $init, $dex);
+				   $name = $init = "";
+				   $dex = 10;
+				   $nameentry->focus();
+		 }); 
+
+$dexentry->bind("<Return>", sub { add_char($name, $init, $dex);
+				  $name = $init = "";
+				  $dex = 10;
+				  $nameentry->focus();
+		});
+
 
 #Add and delete buttons in frame that fills bottom of window above Exit
 my $adddeleteframe = $mw->Frame()->pack;
@@ -119,39 +159,6 @@ $adddeleteframe->Button(-text => "Delete",
 							       -fill => 'x');
 
 
-#Entries for name and initiative number
-my $nameentry = $nameframe->Entry(-width => 10,
-		  -textvariable => \$name, 
-		  -background => "white")->pack;
-		   
-my $initentry = $initframe->Entry(-width => 4,
-		  -textvariable => \$init, 
-		  -background => "white")->pack;
-
-my $dexentry =  $dexframe->Entry(-width => 4,
-		  -textvariable => \$dex, 
-		  -background => "white")->pack;
-
-
-#Bindings create this workflow:
-#    [Enter Name] -> <Return> -> [Enter Init] -> <Return> {Repeat}
-# OR [Enter Name] -> <Return> -> [Enter Init] -> <Tab> -> [Enter Dex] -> <Return> {Repeat}
-$nameentry->bind("<Return>", sub { $init = "";
-				   $initentry->focus();
-				 });
-
-$initentry->bind("<Return>", sub{ add_char($name, $init, $dex);
-				  $name = $init = "";
-				  $dex = 10;
-				  $nameentry->focus();
-		                }); 
-
-$dexentry->bind("<Return>", sub { add_char($name, $init, $dex);
-				  $name = $init = "";
-				  $dex = 10;
-				  $nameentry->focus();
-		                });
-
 #Creates a listbox to hold the initiatives and names
 $charlist = $mw->Scrolled("Listbox",
 			     -scrollbars => "oe",
@@ -160,12 +167,16 @@ $charlist = $mw->Scrolled("Listbox",
 			     -width => 30)->pack(-side => "top");
 
 #If clicked with mouse, loads name and initiative into boxes!
-$charlist->bind('<Button-1>', sub { my $element = $charlist->get($charlist->curselection());
-				    $element =~ /(\d+): (.+) \((\d+)\)/;
-				    $init = $1;
-				    $name = $2;
-				    $dex = $3;
-				  });
+$charlist->bind('<Button-1>', 
+		sub { if ($charlist->curselection()){
+		         my $element = $charlist->get($charlist->curselection());
+			 $element =~ /(\d+): (.+) \((\d+)\)/;
+			 $init = $1;
+			 $name = $2;
+			 $dex = $3;
+		      }
+		});
+
 #Clear initiative list
 $mw->Button(-text => "Clear", 
 	    -font => "{Courier New} 12", 
