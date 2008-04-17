@@ -31,15 +31,15 @@ Quux the Bard also rolls a 12 and has a dex of 18
 Bar the Wizard rolls an 8, and has a dex score of 16 
 the hash would look like this:
 
-    %charactersbyinit-> {
-                         12 -> {
-                                18 -> ( Baz, Quux)
-				 8 -> (Foo)
-                               }
-			 8 ->	{
-				 16 -> (Bar)
-				}
-		        }
+%charactersbyinit-> {
+    12 -> {
+           18 -> ( Baz, Quux)
+           8 -> (Foo)
+    }
+    8 -> {
+          16 -> (Bar)
+    }
+}
 	
 =cut
 
@@ -61,13 +61,13 @@ sub print_initiative{
 #Adds (or updates) a character to the initiative order.
 sub add_char{
   my ($name,$init,$dex) = @_;
-  rm_char($name);
-  if ($init =~ /\d/ && $dex =~ /\d/ && $name ne ''){
-    push(@{$charactersbyinit{$init}{$dex}}, $name);
-    print_initiative();
+  if ($init =~ /^\d+$/ && $dex =~ /^\d+$/ && $name ne ''){
+      rm_char($name);
+      push(@{$charactersbyinit{$init}{$dex}}, $name);
+      print_initiative();
   }
   else {
-    carp "Non-numeric Init or non-extant Name!\n";
+      carp "Non-numeric Init or non-extant Name!\n";
   }
 }
 
@@ -101,27 +101,27 @@ $mw->Label(-text => "Inititative Program:\n",
 
 #Frames for name, initiative, and dexterity score.
 my $nameframe = $mw->Frame(-label => "Name: ", 
-			-labelPack => [ -side => 'left'])->pack;
+			   -labelPack => [ -side => 'left'])->pack;
 
 my $initframe = $mw->Frame(-label => "Init: ", 
-			-labelPack => [ -side => 'left'])->pack;
+			   -labelPack => [ -side => 'left'])->pack;
 
 my $dexframe  = $mw->Frame(-label => "Dex: ", 
-			-labelPack => [ -side => 'left'])->pack;
+			   -labelPack => [ -side => 'left'])->pack;
 
 
 #Entries for name, initiative, and dexterity score
 my $nameentry = $nameframe->Entry(-width => 10,
-		  -textvariable => \$name, 
-		  -background => "white")->pack;
+				  -textvariable => \$name, 
+				  -background => "white")->pack;
 		   
 my $initentry = $initframe->Entry(-width => 4,
-		  -textvariable => \$init, 
-		  -background => "white")->pack;
+				  -textvariable => \$init, 
+				  -background => "white")->pack;
 
 my $dexentry =  $dexframe->Entry(-width => 4,
-		  -textvariable => \$dex, 
-		  -background => "white")->pack;
+				 -textvariable => \$dex, 
+				 -background => "white")->pack;
 
 #Bindings create this workflow:
 #    [Enter Name] -> <Return> -> [Enter Init] -> <Return> {Repeat}
@@ -161,20 +161,21 @@ $adddeleteframe->Button(-text => "Delete",
 
 #Creates a listbox to hold the initiatives and names
 $charlist = $mw->Scrolled("Listbox",
-			     -scrollbars => "oe",
-			     -selectmode => "single",
-			     -height => 20,
-			     -width => 30)->pack(-side => "top");
+			  -scrollbars => "oe",
+			  -selectmode => "single",
+			  -height => 20,
+			  -width => 30)->pack(-side => "top");
 
 #If clicked with mouse, loads name and initiative into boxes!
 $charlist->bind('<Button-1>', 
-		sub { if ($charlist->curselection()){
-		         my $element = $charlist->get($charlist->curselection());
-			 $element =~ /(\d+): (.+) \((\d+)\)/;
-			 $init = $1;
-			 $name = $2;
-			 $dex = $3;
-		      }
+		sub { 
+		    if ($charlist->curselection()){
+		        my $element = $charlist->get($charlist->curselection());
+			$element =~ /(\d+): (.+) \((\d+)\)/;
+			if ($1){$init = $1};
+			if ($2){$name = $2}; 
+			if ($3){$dex =  $3};
+		    }
 		});
 
 #Clear initiative list
