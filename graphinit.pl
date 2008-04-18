@@ -7,7 +7,7 @@ require Tk::Font;
 use Carp;
 use strict;
 use warnings;
-my $inits = "";
+
 my $name = "";
 my $init = 0;
 my $dex = 10;
@@ -36,9 +36,9 @@ the hash would look like this:
            18 -> ( Baz, Quux)
            8 -> (Foo)
     }
-    8 -> {
-          16 -> (Bar)
-    }
+     8 -> {
+           16 -> (Bar)
+     }
 }
 	
 =cut
