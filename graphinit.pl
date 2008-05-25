@@ -12,7 +12,6 @@ my $name = "";
 my $init = 0;
 my $dex = 10;
 my %charactersbyinit = ();
-my @listchars = ();
 my $charlist;
 
 =pod
@@ -43,6 +42,7 @@ the hash would look like this:
 	
 =cut
 
+#Prints the current initiative from %charactersbyinit  to $charlist
 sub print_initiative{
   $charlist->delete(0, 'end');
   my @sorted_keys = sort {$b <=> $a} keys %charactersbyinit;
