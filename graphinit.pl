@@ -11,9 +11,12 @@ use warnings;
 my $name = "";
 my $init = 0;
 my $dex = 10;
+my $selected = '';
+my $scratchpad = '';
 my %charactersbyinit = ();
+my %notes = ();
 my $charlist;
-my ($nameframe, $initframe, $dexframe);
+my ($nameframe, $initframe, $dexframe, $boxframe);
 my ($nameentry, $initentry, $dexentry);
 my $mw;
 
@@ -42,7 +45,10 @@ the hash would look like this:
            16 -> (Bar)
      }
 }
-    
+
+%notes is a simple hash keyed by name, the value being that character's
+attached notes.
+
 =cut
 
 #Prints the current initiative from %charactersbyinit  to $charlist
@@ -60,10 +66,21 @@ sub print_initiative{
         }   
     }
 }
+
+sub update_notes {
+    my $name = shift;
+    my $text = $scratchpad->Contents();
+    chomp $text;
+    $notes{$selected} = $text; 
+    $selected = $name;
+    $scratchpad->Contents($notes{$name});
+}
+
     
 #Adds (or updates) a character to the initiative order.
 sub add_char{
     my ($name,$init,$dex) = @_;
+    update_notes($name);
     if ($init =~ /^\d+$/ && $dex =~ /^\d+$/ && $name ne ''){
         rm_char($name);
         push(@{$charactersbyinit{$init}{$dex}}, $name);
@@ -97,9 +114,8 @@ sub rm_char{
 }
 
 sub focus_on_nameentry {
-    $name = $init = "";
-    $dex = 10;
-    $nameentry->focus();
+   $nameentry->focus();
+   $nameentry->selectionRange(0,'end');
 }
 
 
@@ -153,43 +169,58 @@ $dexentry->bind("<Return>", sub { add_char($name, $init, $dex);
 my $adddeleteframe = $mw->Frame()->pack;
 
 $adddeleteframe->Button(-text => "Add", 
-                        -font => "{Courier New} 12", 
-                        -command => sub{add_char($name, $init, $dex);
-                                        focus_on_nameentry()})->pack(-side => 'left', 
-                                                                             -expand => 0, 
-                                                                             -fill => 'x');
-    
+			-font => "{Courier New} 12", 
+			-command => sub{add_char($name, $init, $dex)})->pack(-side => 'left', 
+								       -expand => 0, 
+								       -fill => 'x');
+
 $adddeleteframe->Button(-text => "Delete", 
-                        -font => "{Courier New} 12", 
-                        -command => sub{rm_char($name);
-                                        focus_on_nameentry();})->pack(-side => 'left', 
-                                                                      -expand => 0, 
-                                                                      -fill => 'x');
+			-font => "{Courier New} 12", 
+			-command => sub{rm_char($name);
+                                        delete $notes{$name};
+                                        $scratchpad->Contents('')})->pack(-side => 'left', 
+                                                                          -expand => 0, 
+                                                                          -fill => 'x');
+#Creates a frame with a listbox to hold the initiatives and names, and a textarea
+#for the notes
+$boxframe = $mw->Frame()->pack;
+$charlist = $boxframe->Scrolled("Listbox",
+                                -label => 'Characters',
+                                -scrollbars => "oe",
+                                -selectmode => "single",
+                                -height => 20,
+                                -width => 20)->pack(-side => 'left');
+
+$scratchpad = $boxframe->Scrolled("Text",
+                                  -label => "Notes",
+                                  -scrollbars =>'oe',
+                                  -height => '27',
+                                  -background => 'white',
+                                  -width => 30)->pack(-side => 'right');
 
 
-#Creates a listbox to hold the initiatives and names
-$charlist = $mw->Scrolled("Listbox",
-                          -scrollbars => "oe",
-                          -selectmode => "single",
-                          -height => 20,
-                          -width => 30)->pack(-side => "top");
+
+#If clicked with mouse, loads name and initiative into boxes!
 
 #If clicked with mouse, loads name and initiative into boxes!
 $charlist->bind('<Button-1>', 
-                sub { 
-                    if ($charlist->curselection()){
-                        my $element = $charlist->get($charlist->curselection());
-                        $element =~ /(\d+): (.+) \((\d+)\)/;
-                        if ($1){$init = $1};
-                        if ($2){$name = $2}; 
-                        if ($3){$dex =  $3};
-                    }
-                });
+		sub { 
+		    if ($charlist->curselection()){
+		        my $element = $charlist->get($charlist->curselection());
+			$element =~ /(\d+): (.+) \((\d+)\)/;
+			if ($1){$init = $1};
+			if ($2){$name = $2;
+                                update_notes($name);
+                        }; 
+			if ($3){$dex =  $3};
+		    }
+		});
 
 #Clear initiative list
 $mw->Button(-text => "Clear", 
             -font => "{Courier New} 12", 
             -command => sub {%charactersbyinit = ();
+                             %notes = ();
                              print_initiative();})->pack(-side => 'top', 
                                                          -expand => 1, 
                                                          -fill => 'x');
