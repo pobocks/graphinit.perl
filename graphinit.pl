@@ -3,7 +3,7 @@
 # in any RPG system using normal numbers, highest-goes-first.
 
 use Tk;
-require Tk::Font;
+use Tk::Font;
 use Carp;
 use strict;
 use warnings;
@@ -16,7 +16,7 @@ my $scratchpad = '';
 my %charactersbyinit = ();
 my %notes = ();
 my $charlist;
-my ($nameframe, $initframe, $dexframe, $boxframe);
+my ($nameframe, $initframe, $dexframe, $boxframe, $buttonframe);
 my ($nameentry, $initentry, $dexentry);
 my $mw;
 
@@ -121,6 +121,8 @@ sub focus_on_nameentry {
 
 #Make main window
 $mw= MainWindow->new;
+my $xe = $mw->XEvent;
+$mw->resizable(0,1);
 $mw->title("Initiative");
 $mw->Label(-text => "Inititative Program:\n",  
            -font => "{Courier New} 12")->pack;
@@ -183,20 +185,25 @@ $adddeleteframe->Button(-text => "Delete",
                                                                           -fill => 'x');
 #Creates a frame with a listbox to hold the initiatives and names, and a textarea
 #for the notes
-$boxframe = $mw->Frame()->pack;
+$boxframe = $mw->Frame()->pack( -expand => 1,
+                                -fill => 'y');
+
 $charlist = $boxframe->Scrolled("Listbox",
                                 -label => 'Characters',
                                 -scrollbars => "oe",
                                 -selectmode => "single",
                                 -height => 20,
-                                -width => 20)->pack(-side => 'left');
+                                -width => 20)->pack(-side => 'left',
+                                                    -expand => 1,
+                                                    -fill => 'y');
 
 $scratchpad = $boxframe->Scrolled("Text",
                                   -label => "Notes",
                                   -scrollbars =>'oe',
-                                  -height => '27',
                                   -background => 'white',
-                                  -width => 30)->pack(-side => 'right');
+                                  -width => 30)->pack(-side => 'right',
+                                      -expand => 1,
+                                      -fill => 'y');
 
 
 
@@ -217,21 +224,43 @@ $charlist->bind('<Button-1>',
 		});
 
 #Clear initiative list
-$mw->Button(-text => "Clear", 
-            -font => "{Courier New} 12", 
-            -command => sub {%charactersbyinit = ();
-                             %notes = ();
-                             print_initiative();})->pack(-side => 'top', 
-                                                         -expand => 1, 
-                                                         -fill => 'x');
+$buttonframe = $mw->Frame()->pack(-fill => 'x',
+                                  -side => 'top');
+
+$buttonframe->Button(-text => "Clear", 
+	    -font => "{Courier New} 12", 
+	    -command => sub {%charactersbyinit = ();
+			     print_initiative();})->pack(-side => 'top', 
+						     -expand => 1, 
+						     -fill => 'x');
+
+$buttonframe->Button(-text => 'Notes',
+            -font => '{Courier New} 12',
+            -command => sub {
+                if (eval {$scratchpad->packInfo()} ) {
+                    $scratchpad->packForget();
+                }
+                else {
+                    $scratchpad->pack(-side => 'right',
+                                      -expand => 1,
+                                      -fill => 'y',
+                                      -after => $charlist,
+                                      -in => $boxframe);
+                }
+                }
+        )->pack(-side => 'top',
+                -expand => 1,
+                -fill => 'x');
+
 
 
 #Exit button fills bottom of window
-$mw->Button(-text => "Exit", 
-            -font => "{Courier New} 12", 
-            -command => sub {$mw->destroy})->pack(-side => 'top', 
-                                                  -expand => 1, 
-                                                  -fill => 'x');
+$buttonframe->Button(-text => "Exit", 
+	    -font => "{Courier New} 12", 
+	    -command => sub {$mw->destroy})->pack(-side => 'top', 
+						  -expand => 1, 
+						  -fill => 'x');
 
+$mw->minsize(0, 700);
 
 MainLoop;
