@@ -5,8 +5,10 @@
 use Tk;
 use Tk::Font;
 use Carp;
+use Storable;
 use strict;
 use warnings;
+use Tk::FBox;
 
 my $name = "";
 my $init = 0;
@@ -16,10 +18,11 @@ my $scratchpad = '';
 my %charactersbyinit = ();
 my %notes = ();
 my $charlist;
-my ($nameframe, $initframe, $dexframe, $boxframe, $buttonframe);
+my ($nameframe, $initframe, $dexframe, $boxframe, $buttonframe, $adddeleteframe);
 my ($nameentry, $initentry, $dexentry);
 my $mw;
-
+my $menu;
+my $filecascade;
 =pod
 
 =head1 DATA STRUCTURE NOTES: 
@@ -113,6 +116,44 @@ sub rm_char{
     print_initiative();
 }
 
+sub fileDialog {
+    my $w = shift;
+    my $operation = shift;
+    my @types;
+    my $file;
+    #   Type names		Extension(s)	Mac File Type(s)
+    #
+    #---------------------------------------------------------
+    @types =
+      (["Init files",           [qw/.init/]],
+       ["All files",		'*']
+      );
+    if ($operation eq 'open') {
+	$file = $w->getOpenFile(-filetypes => \@types);
+    } else {
+	$file = $w->getSaveFile(-filetypes => \@types,
+				-initialfile => 'Untitled',
+				-defaultextension => '.init');
+    }
+    if (defined $file and $file ne '') {
+	return $file;
+    }
+}
+
+
+sub save_inits {
+  my $filename = shift;
+  store [\%charactersbyinit, \%notes], $filename;
+}
+
+sub load_inits {
+  my $filename = shift;
+  my $inits_notes = retrieve "$filename";
+  %charactersbyinit = %{$inits_notes->[0]};
+  %notes = %{$inits_notes->[1]};
+  print_initiative();
+}
+
 sub focus_on_nameentry {
    $nameentry->focus();
    $nameentry->selectionRange(0,'end');
@@ -126,6 +167,22 @@ $mw->resizable(0,1);
 $mw->title("Initiative");
 $mw->Label(-text => "Inititative Program:\n",  
            -font => "{Courier New} 12")->pack;
+$menu = $mw->Menu(-type => 'menubar');
+$mw ->configure(-menu => $menu);
+$filecascade = $menu->cascade(-label => '~File', -tearoff => 0);
+$filecascade->command(-label => 'Save Initiatives',
+		      -command => sub { update_notes($name);
+			                my $file = fileDialog($mw, 'Save');
+					save_inits($file) if ($file);
+				      });
+
+$filecascade->command(-label => 'Load Initiatives',
+		      -command => sub { my $file = fileDialog($mw, 'open');
+					load_inits($file) if ($file);
+				      });
+
+$filecascade->command(-label => 'Exit',
+		      -command => sub { exit;});
 
 #Frames for name, initiative, and dexterity score.
 $nameframe = $mw->Frame(-label => "Name: ", 
@@ -168,7 +225,7 @@ $dexentry->bind("<Return>", sub { add_char($name, $init, $dex);
 
 
 #Add and delete buttons in frame that fills bottom of window above Exit
-my $adddeleteframe = $mw->Frame()->pack;
+$adddeleteframe = $mw->Frame()->pack;
 
 $adddeleteframe->Button(-text => "Add", 
 			-font => "{Courier New} 12", 
@@ -229,7 +286,10 @@ $buttonframe = $mw->Frame()->pack(-fill => 'x',
 
 $buttonframe->Button(-text => "Clear", 
 	    -font => "{Courier New} 12", 
-	    -command => sub {%charactersbyinit = ();
+	    -command => sub {
+	                     $name = '';
+			     update_notes($name);
+	                     %charactersbyinit = ();
 			     print_initiative();})->pack(-side => 'top', 
 						     -expand => 1, 
 						     -fill => 'x');
@@ -251,15 +311,6 @@ $buttonframe->Button(-text => 'Notes',
         )->pack(-side => 'top',
                 -expand => 1,
                 -fill => 'x');
-
-
-
-#Exit button fills bottom of window
-$buttonframe->Button(-text => "Exit", 
-	    -font => "{Courier New} 12", 
-	    -command => sub {$mw->destroy})->pack(-side => 'top', 
-						  -expand => 1, 
-						  -fill => 'x');
 
 $mw->minsize(0, 700);
 
